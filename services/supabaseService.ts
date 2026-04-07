@@ -74,6 +74,21 @@ export const signUp = async (email: string, password: string, name: string) => {
 
     console.log('Stats created');
 
+    // Try to sign in immediately to create session
+    // This helps if email confirmation is required but user was created
+    try {
+      const signInResult = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      if (signInResult.data?.session) {
+        console.log('Session created after signup');
+      }
+    } catch (signInError) {
+      console.log('Sign in after signup failed (may require email confirmation):', signInError);
+      // Still continue - user was created, just no session yet
+    }
+
     return { success: true, userId: authData.user.id };
   } catch (error) {
     console.error('Sign up error:', error);
@@ -108,108 +123,51 @@ export const signOut = async () => {
 // User Stats Functions
 export const getUserStats = async (userId: string): Promise<UserStats | null> => {
   try {
-    // Get current user from auth to get email
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !authUser) {
-      console.error('Auth error:', authError);
-      throw authError || new Error('No authenticated user');
-    }
-
-    let actualUserId = userId;
-    let userData: any = null;
-
-    // Try to get user from database
-    let { data: userFromDb, error: userError } = await supabase
+    // Get user from database directly - no session required
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('id', userId)
       .single();
 
-    // If user doesn't exist in database, create them
     if (userError) {
-      if (userError.code === 'PGRST116') {
-        console.log('User not found, creating new user...');
-        
-        const { error: insertError, data: newUserData } = await supabase
-          .from('users')
-          .insert([{
-            id: userId,
-            email: authUser.email || '',
-            name: authUser.user_metadata?.name || 'User',
-            avatar: getRandomAvatar()
-          }])
-          .select()
-          .single();
-
-        if (insertError) {
-          if (insertError.code === '23505') { // Unique constraint violation
-            console.log('Email already exists, fetching existing user...');
-            const { data: existingUser, error: fetchError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('email', authUser.email)
-              .single();
-            
-            if (fetchError) throw fetchError;
-            userData = existingUser;
-            actualUserId = existingUser.id;
-          } else {
-            throw insertError;
-          }
-        } else {
-          userData = newUserData;
-          actualUserId = newUserData.id;
-        }
-      } else {
-        throw userError;
-      }
-    } else {
-      userData = userFromDb;
+      console.error('User fetch error:', userError);
+      return null;
     }
 
-    // Get user stats using actual user ID
-    let { data: statsData, error: statsError } = await supabase
+    // Get user stats from database
+    const { data: statsData, error: statsError } = await supabase
       .from('user_stats')
       .select('*')
-      .eq('user_id', actualUserId)
+      .eq('user_id', userId)
       .single();
 
-    // If no stats exist, create default ones
-    if (statsError) {
-      if (statsError.code === 'PGRST116') {
-        console.log('Creating default stats for user:', actualUserId);
-        const subProgress: Record<string, number> = {};
-        const defaultStats = {
-          user_id: actualUserId,
-          points: 0,
-          hearts: 5,
-          level: 1,
-          current_streak: 0,
-          last_activity_date: new Date().toDateString(),
-          solved_count: 0,
-          solved_today: 0,
-          correct_answers: 0,
-          mistakes_count: 0,
-          subject_progress: subProgress,
-          weak_topics: {},
-          achievements: INITIAL_ACHIEVEMENTS
-        };
-
-        const { data: newStats, error: insertError } = await supabase
-          .from('user_stats')
-          .insert([defaultStats])
-          .select()
-          .single();
-
-        if (insertError) throw insertError;
-        statsData = newStats;
-      } else {
-        throw statsError;
-      }
+    if (statsError && statsError.code !== 'PGRST116') {
+      console.error('Stats fetch error:', statsError);
+      return null;
     }
 
-    return mapToUserStats(userData, statsData);
+    // If user exists, return their stats
+    if (userData) {
+      return {
+        email: userData.email,
+        name: userData.name,
+        points: statsData?.points || 0,
+        hearts: statsData?.hearts || 5,
+        level: statsData?.level || 1,
+        currentStreak: statsData?.current_streak || 0,
+        solvedCount: statsData?.solved_count || 0,
+        solvedToday: statsData?.solved_today || 0,
+        correctAnswers: statsData?.correct_answers || 0,
+        mistakesCount: statsData?.mistakes_count || 0,
+        subjectProgress: statsData?.subject_progress || {},
+        weakTopics: statsData?.weak_topics || {},
+        achievements: statsData?.achievements || INITIAL_ACHIEVEMENTS,
+        avatar: userData.avatar || '😊'
+      };
+    }
+
+    return null;
   } catch (error) {
     console.error('Get user stats error:', error);
     return null;

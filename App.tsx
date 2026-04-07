@@ -89,18 +89,22 @@ const App: React.FC = () => {
       
       if (isNew) {
         // Sign up errors
-        if (errorMsg.includes('already registered') || errorMsg.includes('User already exists') || errorMsg.includes('duplicate')) {
+        if (errorMsg.includes('rate limit')) {
+          alert(lang === 'ru' ? "Слишком много попыток регистрации. Попробуйте позже." : "Тіркелу ынамайтын көп сынау. Кейінірек қайтап көрініз.");
+        } else if (errorMsg.includes('already registered') || errorMsg.includes('User already exists') || errorMsg.includes('duplicate')) {
           alert(lang === 'ru' ? "Такой email уже зарегистрирован!" : "Бұл email тіркеліп қойған!");
         } else if (errorMsg.includes('password') && errorMsg.includes('too')) {
           alert(lang === 'ru' ? "Пароль должен быть минимум 6 символов" : "Құпия сөз кем дегенде 6 таңба болуы керек");
-        } else if (errorMsg.includes('invalid') || errorMsg.includes('email')) {
+        } else if (errorMsg.includes('invalid') && errorMsg.includes('email')) {
           alert(lang === 'ru' ? "Некорректный email адрес" : "Email мекенжайы дұрыс емес");
         } else {
           alert(lang === 'ru' ? `Ошибка регистрации: ${error?.message || 'попробуй еще раз'}` : `Тіркелу қатесі: ${error?.message || 'қайта байқап көр'}`);
         }
       } else {
         // Sign in errors
-        if (errorMsg.includes('invalid') || errorMsg.includes('wrong') || errorMsg.includes('denied')) {
+        if (errorMsg.includes('rate limit')) {
+          alert(lang === 'ru' ? "Слишком много попыток входа. Попробуйте позже." : "Кіру ынамайтын көп сынау. Кейінірек қайтап көрініз.");
+        } else if (errorMsg.includes('invalid') || errorMsg.includes('wrong') || errorMsg.includes('denied')) {
           alert(t.wrongPassword);
         } else if (errorMsg.includes('not found')) {
           alert(t.userNotFound);

@@ -5,7 +5,7 @@ import { TRANSLATIONS } from '../constants';
 import { Language } from '../types';
 
 interface AuthViewProps {
-  onAuth: (email: string, password: string, name: string, isNew: boolean) => void;
+  onAuth: (email: string, password: string, name: string, isNew: boolean) => Promise<void>;
   lang: Language;
 }
 
@@ -18,7 +18,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuth, lang }) => {
   
   const t = TRANSLATIONS[lang];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const trimmedEmail = email.trim();
@@ -36,11 +36,15 @@ const AuthView: React.FC<AuthViewProps> = ({ onAuth, lang }) => {
     }
 
     setLoading(true);
-    // Use setTimeout to allow UI feedback
-    setTimeout(() => {
-      onAuth(trimmedEmail, trimmedPassword, trimmedName, !isLogin);
-      setLoading(false);
-    }, 300);
+    try {
+      await onAuth(trimmedEmail, trimmedPassword, trimmedName, !isLogin);
+      // Success - loading state will remain until we're navigated away
+    } catch (err) {
+      // Error was handled by parent, reset loading after a delay to allow retry
+      setTimeout(() => {
+        setLoading(false);
+      }, 1000);
+    }
   };
 
   return (
