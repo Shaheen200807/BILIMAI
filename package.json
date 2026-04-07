@@ -1,0 +1,30 @@
+{
+  "name": "bilimai-edu",
+  "version": "1.0.0",
+  "description": "Educational app for NIS/BIL preparation",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@google/genai": "^1.35.0",
+    "@supabase/supabase-js": "^2.101.1",
+    "canvas-confetti": "^1.9.3",
+    "lucide-react": "^0.446.0",
+    "motion": "^12.38.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "recharts": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.6.4",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0"
+  }
+}
