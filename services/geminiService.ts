@@ -1,9 +1,9 @@
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Subject, Problem, Language, Difficulty } from '../types';
 
-// Use VITE_GEMINI_API_KEY for Vite browser environment
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
+// Use OpenRouter API
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY;
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 export const generateProblem = async (
   subject: Subject, 
@@ -13,70 +13,88 @@ export const generateProblem = async (
 ): Promise<Problem> => {
   const languageName = lang === 'ru' ? 'Russian' : 'Kazakh';
   
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    config: {
-      systemInstruction: `You are an expert educator for NIS (Nazarbayev Intellectual Schools) and BIL (BIL-Inovatsiya Lyceums) entrance exams for 6th-grade students.
-      Your goal is to generate high-quality, challenging questions that strictly match the NIS/BIL format.
-      
-      CRITICAL RULES:
-      1. NO SIMPLE SCHOOL EXERCISES. Questions must test logic, analysis, speed, and attention.
-      2. DIFFICULTY LEVELS:
-         - 'easy': Basic thinking, but not primitive. Requires logic.
-         - 'medium': Minimum 2-step solution, hidden conditions, deep analysis.
-         - 'hard': Logical traps, non-standard "out-of-the-box" thinking.
-      3. SUBJECT SPECIFICS:
-         - MATH: NO simple arithmetic (e.g., 1/2 + 1/3). Use word problems, fractions in context, percentages, equations, comparisons of values, and strategic choices.
-         - LOGIC: Use worst-case scenarios, patterns, sequences, spatial reasoning (figures), and logical exclusions.
-         - READING LITERACY: Short texts with questions on meaning/inference. No direct, obvious answers.
-         - CRITICAL THINKING: Situational analysis and choosing the correct logical conclusion.
-      4. OPTIONS: Exactly 4 options. Distractors must be plausible and based on common mistakes.
-      5. LANGUAGE: Generate content EXCLUSIVELY in ${languageName}. DO NOT use Russian if the language is Kazakh.
-      6. SELF-CORRECTION: Before returning, verify if the question is too easy for NIS/BIL level. If so, automatically make it more complex.
-      7. EXPLANATION: Provide a VERY CONCISE explanation (max 1-2 short sentences).`,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          id: { type: Type.STRING },
-          title: { type: Type.STRING },
-          subject: { type: Type.STRING },
-          difficulty: { type: Type.STRING },
-          steps: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.STRING },
-                question: { type: Type.STRING },
-                options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                correctAnswer: { type: Type.STRING },
-                explanation: { type: Type.STRING },
-                topic: { type: Type.STRING },
-                difficulty: { type: Type.STRING }
-              },
-              required: ["id", "question", "options", "correctAnswer", "explanation", "topic", "difficulty"]
-            }
-          }
-        },
-        required: ["id", "title", "subject", "difficulty", "steps"]
-      }
-    },
-    contents: `Generate ${count} ${difficulty} level questions for ${subject} in ${languageName}.`
-  });
+  const systemPrompt = `You are an expert educator for NIS (Nazarbayev Intellectual Schools) and BIL (BIL-Inovatsiya Lyceums) entrance exams for 6th-grade students.
+Your goal is to generate high-quality, challenging questions that strictly match the NIS/BIL format.
 
-  if (!response.text) {
-    throw new Error("AI failed to generate content");
-  }
+CRITICAL RULES:
+1. NO SIMPLE SCHOOL EXERCISES. Questions must test logic, analysis, speed, and attention.
+2. DIFFICULTY LEVELS:
+   - 'easy': Basic thinking, but not primitive. Requires logic.
+   - 'medium': Minimum 2-step solution, hidden conditions, deep analysis.
+   - 'hard': Logical traps, non-standard "out-of-the-box" thinking.
+3. SUBJECT SPECIFICS:
+   - MATH: NO simple arithmetic (e.g., 1/2 + 1/3). Use word problems, fractions in context, percentages, equations, comparisons of values, and strategic choices.
+   - LOGIC: Use worst-case scenarios, patterns, sequences, spatial reasoning (figures), and logical exclusions.
+   - READING LITERACY: Short texts with questions on meaning/inference. No direct, obvious answers.
+   - CRITICAL THINKING: Situational analysis and choosing the correct logical conclusion.
+4. OPTIONS: Exactly 4 options. Distractors must be plausible and based on common mistakes.
+5. LANGUAGE: Generate content EXCLUSIVELY in ${languageName}. DO NOT use Russian if the language is Kazakh.
+6. SELF-CORRECTION: Before returning, verify if the question is too easy for NIS/BIL level. If so, automatically make it more complex.
+7. EXPLANATION: Provide a VERY CONCISE explanation (max 1-2 short sentences).
+
+RETURN ONLY VALID JSON, no markdown or extra text.`;
+
+  const userPrompt = `Generate ${count} ${difficulty} level questions for ${subject} in ${languageName}.
+
+Return ONLY a valid JSON object with this exact structure (no markdown, no extra text):
+{
+  "id": "problem_${Date.now()}",
+  "title": "Problem title in ${languageName}",
+  "subject": "${subject}",
+  "difficulty": "${difficulty}",
+  "steps": [
+    {
+      "id": "step_1",
+      "question": "Question text in ${languageName}",
+      "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+      "correctAnswer": "Correct option text",
+      "explanation": "Brief explanation in ${languageName}",
+      "topic": "Topic name",
+      "difficulty": "${difficulty}"
+    }
+  ]
+}`;
 
   try {
-    const data = JSON.parse(response.text);
-    data.subject = subject;
-    data.difficulty = difficulty;
-    return data;
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error("No content from API");
+    }
+
+    // Extract JSON from content (in case there's markdown)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonContent = jsonMatch ? jsonMatch[0] : content;
+    const problemData = JSON.parse(jsonContent);
+    
+    problemData.subject = subject;
+    problemData.difficulty = difficulty;
+    return problemData;
   } catch (e) {
-    console.error("AI Response Error:", response.text);
-    throw new Error("AI data corruption: " + e);
+    console.error("API Error:", e);
+    throw new Error("Failed to generate problem: " + e);
   }
 };
 
@@ -90,49 +108,98 @@ export const getAIExplanation = async (
 ): Promise<string> => {
   const languageName = lang === 'ru' ? 'Russian' : 'Kazakh';
   
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    config: {
-      systemInstruction: `You are an expert educator for NIS (Nazarbayev Intellectual Schools) and BIL (BIL-Inovatsiya Lyceums). 
-      Your task is to explain why the correct answer is right and why the student's answer was wrong.
-      STRICT LANGUAGE RULE: Speak ONLY in ${languageName}.
-      Keep the explanation encouraging, simple, and logical for a 10-14 year old student.`,
-      temperature: 0.7 
-    },
-    contents: `Subject: ${subject}.
-    Question: "${question}".
-    Options: ${options.join(', ')}.
-    Correct Answer: "${correctAnswer}".
-    Student's Wrong Answer: "${userAnswer}".
+  const systemPrompt = `You are an expert educator for NIS (Nazarbayev Intellectual Schools) and BIL (BIL-Inovatsiya Lyceums). 
+Your task is to explain why the correct answer is right and why the student's answer was wrong.
+STRICT LANGUAGE RULE: Speak ONLY in ${languageName}.
+Keep the explanation encouraging, simple, and logical for a 10-14 year old student.`;
+
+  const userPrompt = `Subject: ${subject}.
+Question: "${question}".
+Options: ${options.join(', ')}.
+Correct Answer: "${correctAnswer}".
+Student's Wrong Answer: "${userAnswer}".
+
+Provide a detailed but simple explanation in ${languageName}.`;
+
+  try {
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const explanation = data.choices?.[0]?.message?.content;
     
-    Provide a detailed but simple explanation in ${languageName}.`
-  });
-  
-  if (!response.text) {
+    if (!explanation) {
+      return lang === 'ru' ? "Извини, я не смог подготовить объяснение." : "Кешіріңіз, түсіндірме дайындай алмадым.";
+    }
+    
+    return explanation.trim();
+  } catch (e) {
+    console.error("API Error:", e);
     return lang === 'ru' ? "Извини, я не смог подготовить объяснение." : "Кешіріңіз, түсіндірме дайындай алмадым.";
   }
-  
-  return response.text.trim();
 };
 
 export const getAIHint = async (problemTitle: string, currentStepText: string, subject: Subject, lang: Language): Promise<string> => {
   const languageName = lang === 'ru' ? 'Russian' : 'Kazakh';
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    config: {
-      systemInstruction: `You are BilimAI, a supportive mentor. Speak ONLY in ${languageName}. Never use other languages.`,
-      temperature: 0.7 
-    },
-    contents: `The student is stuck on a ${subject} problem: "${problemTitle}". 
-    Current step: "${currentStepText}". 
-    Give a helpful hint in ${languageName} WITHOUT giving the answer.`
-  });
   
-  if (!response.text) {
+  const systemPrompt = `You are BilimAI, a supportive mentor. Speak ONLY in ${languageName}. Never use other languages.`;
+  
+  const userPrompt = `The student is stuck on a ${subject} problem: "${problemTitle}". 
+Current step: "${currentStepText}". 
+Give a helpful hint in ${languageName} WITHOUT giving the answer.`;
+
+  try {
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-4-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 300,
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const hint = data.choices?.[0]?.message?.content;
+    
+    if (!hint) {
+      return lang === 'ru' ? "Попробуй подумать еще немного!" : "Тағы біраз ойланып көр!";
+    }
+    
+    return hint.trim();
+  } catch (e) {
+    console.error("API Error:", e);
     return lang === 'ru' ? "Попробуй подумать еще немного!" : "Тағы біраз ойланып көр!";
   }
-  
-  return response.text.trim();
 };
 
 function decode(base64: string) {
@@ -166,27 +233,11 @@ async function decodeAudioData(
 
 export const speakText = async (text: string): Promise<void> => {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
-          },
-        },
-      },
-    });
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (base64Audio) {
-      const outputAudioContext = new (window.AudioContext ||
-        (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const audioBuffer = await decodeAudioData(decode(base64Audio), outputAudioContext, 24000, 1);
-      const source = outputAudioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(outputAudioContext.destination);
-      source.start();
+    // Using Web Speech API as fallback
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      window.speechSynthesis.speak(utterance);
     }
   } catch (e) {
     console.error("TTS failed:", e);
