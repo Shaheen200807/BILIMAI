@@ -1,5 +1,28 @@
 
 import { Subject, Achievement, Language } from './types';
+import { MATH_QUESTIONS_NEW } from './mathQuestions';
+
+// Helper to convert new math questions to QUESTION_BANK format
+const convertMathquestions = () => {
+  return MATH_QUESTIONS_NEW.map((q: any, index: number) => {
+    const correctAns = String(q.answer).split(' ')[0];
+    const wrongOptions = !isNaN(Number(correctAns)) 
+      ? [String(Number(correctAns) - 1), String(Number(correctAns) + 1), String(Math.round(Number(correctAns) * 1.5))]
+      : ['Вариант 1', 'Вариант 2', 'Вариант 3'];
+    
+    const optionsRu = [correctAns, ...wrongOptions].sort(() => Math.random() - 0.5);
+    
+    return {
+      id: `m_new_${index + 1}`,
+      question: { ru: q.question, kk: q.question },
+      options: { ru: optionsRu, kk: optionsRu },
+      correctAnswer: { ru: correctAns, kk: correctAns },
+      explanation: { ru: q.explanation, kk: q.explanation }
+    };
+  });
+};
+
+const NEW_MATH_QUESTIONS = convertMathquestions();
 
 export const INITIAL_ACHIEVEMENTS: Achievement[] = [
   { 
@@ -132,7 +155,8 @@ export const QUESTION_BANK: Record<string, any[]> = {
       options: { ru: ['11', '22', '28', '14'], kk: ['11', '22', '28', '14'] },
       correctAnswer: { ru: '28', kk: '28' },
       explanation: { ru: '4 * 7 = 28.', kk: '4 * 7 = 28.' }
-    }
+    },
+    ...NEW_MATH_QUESTIONS
   ],
   [Subject.LOGIC]: [
     {

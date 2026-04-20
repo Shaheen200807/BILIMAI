@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Brain, Heart, AlertCircle, CheckCircle, Volume2, Clock, Sparkles, Hourglass, Lightbulb } from 'lucide-react';
+import { Brain, Heart, AlertCircle, CheckCircle, Volume2, Clock, Sparkles, Hourglass, Lightbulb, MessageCircle } from 'lucide-react';
 import { Problem, Language, Step, AppMode } from '../types';
 import { getAIExplanation, speakText, generateProblem } from '../services/geminiService';
 import { SUBJECT_INFO, TRANSLATIONS } from '../constants';
+import { ChatAI } from './ChatAI';
 import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -25,11 +26,13 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
   const [aiExplanation, setAiExplanation] = useState<string | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [heartsUsed, setHeartsUsed] = useState(0);
+  const [heartsGained, setHeartsGained] = useState(0);
   const [totalMistakes, setTotalMistakes] = useState(0);
   const [mistakesByTopic, setMistakesByTopic] = useState<Record<string, number>>({});
   const [showExplanation, setShowExplanation] = useState(false);
   const [shake, setShake] = useState(false);
   const [motivationMsg, setMotivationMsg] = useState<string | null>(null);
+  const [openChatAI, setOpenChatAI] = useState(false);
   
   // Timer for exam modes
   const [timeLeft, setTimeLeft] = useState<number | null>(() => {
@@ -84,6 +87,11 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
       setMotivationMsg(randomMotivation);
       setTimeout(() => setMotivationMsg(null), 1500);
       
+      // Add hearts on correct answer (max 3 total)
+      if (userHearts - heartsUsed + heartsGained < 3) {
+        setHeartsGained(prev => prev + 1);
+      }
+      
       if (currentStepIndex === steps.length - 1) {
         confetti({
           particleCount: 150,
@@ -103,19 +111,7 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
         }));
       }
 
-      // Logic: Add one more question on EVERY mistake (only in lesson/daily)
-      if (mode === 'lesson' || mode === 'daily') {
-        try {
-          const newProb = await generateProblem(problem.subject, lang, problem.difficulty, 1);
-          if (newProb.steps.length > 0) {
-            setSteps(prev => [...prev, newProb.steps[0]]);
-          }
-        } catch (e) {
-          console.error("Failed to add penalty question", e);
-        }
-      }
-
-      if (userHearts - (heartsUsed + 1) <= 0) {
+      if (userHearts - (heartsUsed + 1) + heartsGained <= 0) {
         setIsGameOver(true);
       }
 
@@ -175,7 +171,9 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
 
   const handleFinish = () => {
     const earnedPoints = Math.max(0, (steps.length * 10) - (totalMistakes * 5));
-    onFinish(earnedPoints, heartsUsed, mistakesByTopic);
+    // Calculate net hearts change (negative = lost, positive = gained)
+    const netHeartsChange = heartsGained - heartsUsed;
+    onFinish(earnedPoints, -netHeartsChange, mistakesByTopic);
   };
 
   const formatTime = (seconds: number) => {
@@ -223,10 +221,19 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
 
       {/* Header Info */}
       <div className="mb-6 flex flex-col gap-4">
-        <div className="flex justify-between items-center">
-          <button onClick={onExit} className="text-slate-400 hover:text-slate-600 transition-colors">
-            ✕ {lang === 'ru' ? 'Выйти' : 'Шығу'}
-          </button>
+        <div className="flex justify-between items-center gap-2">
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setOpenChatAI(true)} 
+              className="text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 text-sm font-black"
+            >
+              <MessageCircle size={20} /> 
+              <span className="hidden sm:inline">{lang === 'ru' ? 'Чат AI' : 'AI Чаты'}</span>
+            </button>
+            <button onClick={onExit} className="text-slate-400 hover:text-slate-600 transition-colors">
+              ✕ {lang === 'ru' ? 'Выйти' : 'Шығу'}
+            </button>
+          </div>
           {timeLeft !== null && (
             <div className={`px-6 py-2 rounded-2xl font-black text-lg shadow-sm border-2 flex items-center gap-2 ${timeLeft < 60 ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-white border-slate-100 text-slate-700'}`}>
               <Clock size={20} /> {formatTime(timeLeft)}
@@ -235,7 +242,7 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
           <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100">
             <div className="flex items-center gap-1">
               <Heart className="text-red-500" size={20} />
-              <span className="font-black">{userHearts - heartsUsed}</span>
+              <span className="font-black">{userHearts - heartsUsed + heartsGained}</span>
             </div>
           </div>
         </div>
@@ -382,6 +389,9 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
           </button>
         )}
       </div>
+
+      {/* Chat AI Modal */}
+      {openChatAI && <ChatAI lang={lang} onClose={() => setOpenChatAI(false)} />}
     </div>
   );
 };
