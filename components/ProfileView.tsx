@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Heart, Star, CheckCircle, AlertCircle, Trophy, Flame } from 'lucide-react';
+import { Heart, Star, CheckCircle, AlertCircle, Trophy, Flame, Settings } from 'lucide-react';
 import { UserStats, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 
@@ -8,6 +8,7 @@ interface ProfileViewProps {
   stats: UserStats;
   lang: Language;
   onLogout: () => void;
+  onAdminClick?: () => void;
 }
 
 const ProfileView: React.FC<ProfileViewProps> = ({ stats, lang, onLogout }) => {

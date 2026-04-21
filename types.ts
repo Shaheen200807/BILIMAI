@@ -2,8 +2,8 @@
 export enum Subject {
   MATH = 'Математика',
   LOGIC = 'Логика',
-  READING = 'Грамотность чтения',
-  CRITICAL = 'Критическое мышление'
+  RUSSIAN = 'Русский язык',
+  KAZAKH = 'Қазақ тілі'
 }
 
 export type Language = 'ru' | 'kk';
@@ -54,6 +54,7 @@ export interface UserStats {
   weakTopics?: Record<string, number>; // Анализ слабых тем
   achievements: Achievement[];
   avatar: string;
+  isAdmin?: boolean; // Права администратора
 }
 
 export type View = 'dashboard' | 'lesson' | 'parent' | 'profile' | 'auth' | 'exam-result';

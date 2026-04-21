@@ -337,7 +337,7 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
 
         {/* Feedback Section */}
         <AnimatePresence>
-          {aiExplanation && (
+          {aiExplanation ? (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -355,9 +355,7 @@ const LessonView: React.FC<LessonViewProps> = ({ problem, lang, userHearts, mode
                 </button>
               </div>
             </motion.div>
-          )}
-
-          {showExplanation && (
+          ) : showExplanation && (
             <motion.div 
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
